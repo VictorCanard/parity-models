@@ -1,0 +1,14 @@
+{
+  "num_epoch": 500,
+  "k_vals": [2, 3, 4],
+  "enc_dec_types": [["EmbeddedEncoder", "SubtractionDecoder"]],
+  "datasets": ["wikitext"],
+  "base_parity_models": [["gpt2", "gpt2"]],
+  "losses": ["MSELoss"],
+  "train_encoder": false,
+  "train_parity_model": true,
+  "train_decoder": false,
+  "use_wandb" :  false,
+  "wandb_project" : "gpt2-parity"
+}
+

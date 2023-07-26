@@ -1,0 +1,11 @@
+{
+  "num_epoch": 500,
+  "k_vals": [2, 3, 4],
+  "enc_dec_types": [["AdditionEncoder", "SubtractionDecoder"]],
+  "datasets": ["mnist"],
+  "base_parity_models": [["base-mlp", "base-mlp"], ["resnet18", "resnet18"]],
+  "losses": ["MSELoss"],
+  "train_encoder": false,
+  "train_parity_model": true,
+  "train_decoder": false
+}

@@ -1,0 +1,11 @@
+{
+  "num_epoch": 100,
+  "k_vals": [2],
+  "enc_dec_types": [["coders.image.ConvConcatEncoder", "coders.summation.SubtractionDecoder"]],
+  "datasets": ["mnist"],
+  "base_parity_models": [["base-mlp", "base-mlp"], ["resnet18", "resnet18"]],
+  "losses": ["torch.nn.MSELoss"],
+  "train_encoder": true,
+  "train_parity_model": true,
+  "train_decoder": false
+}

@@ -1,0 +1,11 @@
+{
+  "num_epoch": 1000,
+  "k_vals": [2],
+  "enc_dec_types": [["coders.mlp.MLPEncoder", "coders.mlp.MLPDecoder"]],
+  "datasets": ["mnist"],
+  "base_parity_models": [["base-mlp", "base-mlp"]],
+  "losses": ["torch.nn.MSELoss"],
+  "train_encoder": true,
+  "train_parity_model": true,
+  "train_decoder": true
+}
