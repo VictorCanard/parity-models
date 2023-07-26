@@ -1,2 +1,4 @@
 /train/data/
 /train/base_model_trained_files/
+/train/save/
+/train/wandb/
