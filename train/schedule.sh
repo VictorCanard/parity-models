@@ -7,6 +7,7 @@ export EPFML_LDAP=vcanard
 export EPFML_STORE_S3_BUCKET=13319-806957bd411dbc36a20db4f5c5f90f7b
 export EPFML_STORE_S3_ENDPOINT=https://s3.epfl.ch
 
+
 USER=vcanard
 LAB=linx
 
@@ -17,7 +18,7 @@ CODE_BUNDLE=`epfml bundle pack .`
 
 # Generate a unique ID for wandb. This makes sure that automatic restarts continue with the same job.
 RUN_ID=`python -c "import wandb; print(wandb.util.generate_id())"`;
-RUN_FILE="python train.py"
+RUN_FILE="python train.py config/wikitext/wikitext.json save"
 
 
 runai submit \

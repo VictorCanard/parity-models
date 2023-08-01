@@ -143,11 +143,12 @@ def write_vals_dict(outfile, val_dict, use_wandb, label):
     if use_wandb:
         wandb.log({label: val_dict}) #TODO add itr?
 
-    for k, v in val_dict.items():
+    else:
+        for k, v in val_dict.items():
         # if use_wandb:
         #     k1 = label + "_{}.txt"
         #     k1.format(k)
         #     wandb.log({
         #         k1: v
         #     })
-        write_value(v, outfile.format(k))
+            write_value(v, outfile.format(k))

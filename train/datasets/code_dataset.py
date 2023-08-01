@@ -12,11 +12,14 @@ from torchvision.datasets import DatasetFolder
 
 from util.util import construct, try_cuda
 
+from data.wikitext import get_wikitext_data
+
+
 
 
 VOCAB_SIZE = 50304
-SEQ_LEN = 8
-BATCH_SIZE = 2
+SEQ_LEN = 512
+BATCH_SIZE = 50
 
 
 class CodeDataset(Dataset):
@@ -128,7 +131,7 @@ class CodeDataset(Dataset):
         # the `outputs` tensor during `__init__`. This avoids having to perform
         # inference over the base model in-line with `__getitem__` calls.
 
-        print("went here at " + str(idx))
+        #print("went here at " + str(idx))
         # if self.extra_transforms:
         #     data, _ = self.dataset[idx]
         #     data = data.view(-1)
@@ -379,11 +382,9 @@ class CatDogCodeDataset(FolderCodeDataset):
                          code_transform=code_transform)
 
 
-data_dir = "data/wikitext/{}"
-train_data = np.memmap(data_dir.format('train/train.bin'), dtype=np.uint16, mode='r')
-val_data = np.memmap(data_dir.format('val/val.bin'), dtype=np.uint16, mode='r')
-test_data = np.memmap(data_dir.format('test/test.bin'), dtype=np.uint16,
-                      mode='r')  # why is test data the same as val data (on the website that's also what they do)
+data_dir = "data/datasets/wikitext/{}"
+data_dictionary = get_wikitext_data()
+
 
 
 class WikiText(Dataset):
@@ -393,7 +394,7 @@ class WikiText(Dataset):
         assert name in {'train', 'test', 'val'}
 
         self.seq_length = SEQ_LEN  # rename to seq len
-        self.data = train_data if name == 'train' else (val_data if name == 'val' else test_data)
+        self.data = data_dictionary[name]
 
     def __getitem__(self, i):
         print("got item at " + str(i))
@@ -406,7 +407,7 @@ class WikiText(Dataset):
         return x, y
 
     def __len__(self):
-        return 8
+        #return 8
         return len(self.data) - self.seq_length
 
 
@@ -483,22 +484,22 @@ def get_dataloaders(dataset_path, base_model, ec_k, batch_size,
                                       pin_memory=pin_mem)
 
     else:
-        total_train = len(train_dataset)
-        indices = list(range(total_train))
+        #total_train = len(train_dataset)
+        #indices = list(range(total_train))
         # shuffle(indices)
 
         print("finished shuffling indices")
-        num_val = 5000
-        remainder = num_val % ec_k
+        #num_val = 5000
+        #remainder = num_val % ec_k
         # Make sure that the training and validation sets have a multiple of
         # ec_k.
-        if remainder != 0:
-            num_val += (ec_k - remainder)
+        #if remainder != 0:
+        #    num_val += (ec_k - remainder)
 
-        train_indices = indices[num_val:]  # todo what is this for? how can i adpat it?
-        val_indices = indices[:num_val]
-        train_sampler = data.sampler.SequentialSampler(train_indices)
-        val_sampler = data.sampler.SequentialSampler(val_indices)
+        #train_indices = indices[num_val:]  # todo what is this for? how can i adpat it?
+        #val_indices = indices[:num_val]
+        #train_sampler = data.sampler.SequentialSampler(train_indices)
+        #val_sampler = data.sampler.SequentialSampler(val_indices)
 
         train_loader = data.DataLoader(train_dataset,
                                        shuffle=True,

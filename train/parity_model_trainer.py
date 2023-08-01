@@ -37,92 +37,8 @@ class ParityModelTrainer(object):
         self.erase_mask, self.acc_mask = self.__gen_masks()
         self.checkpoint_cycle = checkpoint_cycle
 
-    # def train(self):
-    #     return train_base() #last part
 
-    # def train_base(self, model, opt, data, iterations, acc_steps, batch_size, sequence_length, eval_freq,
-    #                    ckpt_path, distributed_backend, extra_args):
-    #     device_type = 'cuda' if 'cuda' in str(extra_args.device) else 'cpu'
-    #     type_ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(
-    #         device_type=device_type, dtype=torch.bfloat16)  # extra_args.dtype)
-    #     itr, substep, best_val_loss, text_table = 0, 0, float(
-    #         'inf'), None  # best_val_loss not used atm, early stopping not recommended but possible
-    #
-    #     stats = {'train_loss': [], 'val_loss': [], 'val_pp': [], 'val_acc': []}
-    #
-    #     num_substeps_per_epoch = len(data['train']) // (batch_size * sequence_length)
-    #
-    #     if not extra_args.no_compile:
-    #         print(f"Compiling model ...")
-    #         model = torch.compile(model)  # requires pytorch 2.0+
-    #
-    #     model.train()
-    #
-    #     t0 = time.time()
-    #     while itr < iterations:
-    #         for microstep_idx in range(acc_steps):  # gradient accumulation
-    #             x, y = get_batch(data['train'], sequence_length, batch_size, device=extra_args.device)
-    #
-    #             outputs = model(x, targets=y)
-    #
-    #             loss = outputs['loss'] / acc_steps
-    #             loss.backward()
-    #             substep += 1
-    #
-    #         if extra_args.grad_clip != 0.0:
-    #             torch.nn.utils.clip_grad_norm_(model.parameters(), extra_args.grad_clip)
-    #         opt.step()
-    #         opt.zero_grad(set_to_none=True)
-    #         itr += 1
-    #
-    #         if itr % eval_freq == 0 or itr == iterations:  # from here it's only evaluation code, all the training is above
-    #             if distributed_backend.is_master_process():
-    #                 t1 = time.time()
-    #                 dt = t1 - t0
-    #                 epoch = substep // num_substeps_per_epoch
-    #
-    #                 model.eval()
-    #                 train_loss = loss.detach().cpu().item()
-    #                 current_lr =  extra_args.lr
-    #                 val_acc, val_loss, val_perplexity = eval(model, data['val'], sequence_length, batch_size,
-    #                                                          extra_args.device, max_num_batches=24, ctx=type_ctx)
-    #
-    #                 print_string = f"{epoch}/{itr} [train] loss={train_loss:.3f} [val] loss={val_loss:.3f}, pp={val_perplexity:.2f}, acc={val_acc:3f}"
-    #                 print_string += f" [time per itr] {dt * 1000 / eval_freq:.2f}ms"
-    #                 print(print_string)
-    #
-    #                 if extra_args.wandb:
-    #                     wandb.log({
-    #                         "iter": itr,
-    #                         "train/loss": train_loss,
-    #                         "val/loss": val_loss,
-    #                         "val/perplexity": val_perplexity,
-    #                         "val/acc": val_acc,
-    #                         "lr": current_lr,
-    #                     })
-    #
-    #                     if extra_args.eval_seq_prefix != 'none' and (
-    #                             itr % (eval_freq * 5) == 0 or itr == iterations):
-    #                         if text_table is None:
-    #                             text_table = wandb.Table(columns=["itr", "val-pp", "text"])
-    #
-    #                         out_str = distributed_backend.get_raw_model(model).generate_from_string(
-    #                             extra_args.eval_seq_prefix, max_new_tokens=40, temperature=0.9, top_k=None)
-    #                         text_table.add_data(itr, val_perplexity, out_str)
-    #                         # why a copy? see github.com/wandb/wandb/issues/2981
-    #                         wandb.log({f"generated-text-{wandb.run.name}": copy.copy(text_table)})
-    #
-    #                 model.train()
-    #                 t0 = time.time()
-    #
-    #     print(f"saving checkpoint to {ckpt_path}")
-    #     save_checkpoint(distributed_backend=distributed_backend,
-    #                     model=model,
-    #                     opt=opt,
-    #                     itr=itr,
-    #                     ckpt_path=ckpt_path)
-    #
-    #     return stats
+
 
     def train(self, wandb=False):
         """
@@ -179,7 +95,7 @@ class ParityModelTrainer(object):
         for mb_data, mb_labels, mb_true_labels in data_loader:  # Is it ok putting one batch of data on the gpu?
             mb_data = try_cuda(mb_data.view(-1, self.ec_k, mb_data.size(1)))
             mb_labels = try_cuda(
-                mb_labels.view(-1, self.ec_k, mb_labels.size(1)))  # size 2?
+                mb_labels.view(-1, self.ec_k, mb_labels.size(1), mb_labels.size(2)))  # size 2?
             mb_true_labels = try_cuda(mb_true_labels.view(-1, self.ec_k, mb_true_labels.size(1)))
 
             if do_step:
@@ -287,44 +203,44 @@ class ParityModelTrainer(object):
             parity_model_target = self.decoder.combine_labels(mb_labels)
 
             loss = self.loss_fn(
-                parity_output.view(-1, parity_output.size(-1)), parity_model_target.view(-1, mb_labels.size(-1))
+                parity_output, parity_model_target
             )
         # The input to the decoder consists of the concatenation of the output of
         # running the parity through the base model and the available base model
         # outputs for original units. Since `mb_labels` contains these outputs of
         # the orignal units, we simply concatenate our parity output with those.
         new_parity_output = parity_output.view(
-            batch_size, -1, parity_output.size(-1))
+            batch_size, 1, -1, parity_output.size(-1))
         #new_parity_output = torch.clone(parity_output)
 
         in_decode = torch.cat((mb_labels, new_parity_output), dim=1)
 
         # Create masks to be used for this minibatch
-        _, num_in, dim = in_decode.size()
-        mb_emask = self.erase_mask.repeat(batch_size, 1, 1)
-        mb_amask = self.acc_mask.repeat(batch_size, 1)
+        bs, kplusr, sl, vs = in_decode.size()
+        mb_emask = torch.unsqueeze(self.erase_mask, dim=2).repeat(batch_size, 1, sl, 1)
+        mb_amask = torch.unsqueeze(self.acc_mask, dim=2).repeat(batch_size, 1, sl)
 
         # Erase entries before passing into decode. The mask simulates each
         # possible erasure scenario.
         num_erasure_scenarios = self.erase_mask.size(0)
-        in_decode = in_decode.repeat(1, num_erasure_scenarios, 1).view(
-            batch_size * num_erasure_scenarios, num_in, dim)
+        in_decode = in_decode.repeat(1, num_erasure_scenarios, 1, 1).view(
+            batch_size * num_erasure_scenarios, kplusr, sl, vs)
         in_decode = in_decode * mb_emask
 
         # Perform decoding
         decoded = self.decoder(in_decode)
 
         # Prepare labels for calculating accuracy
-        d, num_out, out_dim = mb_labels.size()
-        labels = mb_labels.repeat(1, num_erasure_scenarios, 1).view(
-            batch_size * num_erasure_scenarios, num_out, out_dim)
+        bs, k, sl, out_dim = mb_labels.size()
+        labels = mb_labels.repeat(1, num_erasure_scenarios, 1, 1).view(
+            batch_size * num_erasure_scenarios, k, sl, out_dim)
         true_labels = mb_true_labels.repeat(1, num_erasure_scenarios, 1)
-        true_labels = true_labels.view(batch_size * num_erasure_scenarios, num_out, seq_len)
+        true_labels = true_labels.view(batch_size * num_erasure_scenarios, k, sl)
 
         # If the decoder is to be trained, then loss is calculated by comparing
         # the decoded outputs to the output that would have been available if
         # the original output was available.
-        if self.train_decoder:
+        if self.train_decoder: #Have to check; no idea if this works
             predictions = decoded.view(-1, out_dim)
 
             # Prepare appropriate targets for loss depending on whether we're
@@ -336,7 +252,7 @@ class ParityModelTrainer(object):
                 targets = labels.view(-1, out_dim)
             loss = self.loss_fn(predictions, targets,
                                 mb_amask.view(
-                                    -1).float())  # F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+                                    -1).float())
 
         stats.update_loss(loss.item())
         stats.update_accuracies(decoded, labels, true_labels, mb_amask)

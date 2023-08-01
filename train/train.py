@@ -3,7 +3,7 @@ import json
 import os
 import sys
 from shutil import copyfile
-from transformers import GPT2Model
+
 import wandb
 
 from parity_model_trainer import ParityModelTrainer

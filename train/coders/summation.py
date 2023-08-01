@@ -60,7 +60,7 @@ class SubtractionDecoder(Decoder):
         # Subtract availables from parity. Each group in the second dimension
         # already has "unavailables" zeroed-out.
         out = in_data[:, -1] - torch.sum(in_data[:, :-1], dim=1)
-        out = out.unsqueeze(1).repeat(1, self.ec_r, 1)
+        out = out.unsqueeze(1).repeat(1, self.ec_r, 1, 1)
 
         return out
 

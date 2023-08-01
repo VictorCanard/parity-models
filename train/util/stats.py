@@ -6,7 +6,7 @@ def get_top_k(k, decoded, compare, mask):
     Returns the number of elements in ``compare`` for which the corresponding
     entry in ``decoded`` has the value of ``compare`` in its top-k.
     """
-    rep_compare = compare.unsqueeze(2).repeat(1, 1, k)
+    rep_compare = compare.unsqueeze(3).repeat(1, 1, 1, k)
     return torch.sum((decoded.topk(k)[1] == rep_compare).float() * mask.float()).item()
 
 
@@ -74,13 +74,13 @@ class StatsTracker(object):
         Returns running average loss, top-1 rec accuracy, and top-5
         rec accuracy.
         """
-        #TODO
+
         avg_loss = self.loss / self.num_loss_attempts
         top1 = self.running_top1 / self.num_match_attempts
         top5 = self.running_top5 / self.num_match_attempts
         return avg_loss, top1, top5
 
-    def running_overall_averages(self):
+    def running_overall_averages(self): #TODO if needed
         """
         Returns running average loss, top-1 overall accuracy, and top-5
         overall accuracy.
@@ -98,18 +98,19 @@ class StatsTracker(object):
         """
         self.num_match_attempts += decoded.size(0)
 
-        max_decoded = torch.max(decoded, dim=2)[1]
-        max_outputs = torch.max(base_model_outputs, dim=2)[1]
+        max_decoded = torch.max(decoded, dim=3)[1]
+        max_outputs = torch.max(base_model_outputs, dim=3)[1]
 
+        t1 = (max_decoded == max_outputs).float()
         top1_rec_corr = torch.sum(
-            (max_decoded == max_outputs).float() * mask.float()).item()
+             t1 * mask.float()).item()
         self.acc_map["reconstruction_top1"] += top1_rec_corr
 
-	max_true = torch.max(true_labels, dim=2)[1]
+        #max_true = torch.max(true_labels, dim=2)[1]
         # Not sure if we care about overall accuracy at all? (dec: numscenarios x 1 x nc and true_labels: numscen x 2
         # x sl) 
-	top1_correct = torch.sum((max_decoded == max_true).float() * mask.float()).item() 
-	self.acc_map["overall_top1"] += top1_correct
+        top1_correct = torch.sum((max_decoded == true_labels).float() * mask.float()).item()
+        self.acc_map["overall_top1"] += top1_correct
         self.running_top1 += top1_rec_corr
         #
         # # Ignore first of top_k_vals because we already covered it above.
@@ -117,7 +118,7 @@ class StatsTracker(object):
             if decoded.size(-1) < k:
                 break
 
-            acc_mask = mask.unsqueeze(2).repeat(1, 1, k)
+            acc_mask = mask.unsqueeze(3).repeat(1, 1, 1, k)
             rec_correct = get_top_k(k, decoded, max_outputs, acc_mask) #TODO how is this even working?
             self.acc_map["reconstruction_top{}".format(
                 k)] += rec_correct
