@@ -12,7 +12,7 @@ USER=vcanard
 LAB=linx
 
 WANDB_PROJECT="gpt2-parity"
-WANDB_RUN_GROUP="test-try-encoder"
+WANDB_RUN_GROUP="test-try-emb-encoder"
 WANDB_API_KEY=`python -c "import wandb; print(wandb.api.api_key)"`
 CODE_BUNDLE=`epfml bundle pack .`
 

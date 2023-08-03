@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 import sys
+import urllib
+import zipfile
 from shutil import copyfile
 
 import wandb
@@ -72,12 +74,25 @@ def get_loss(loss_type, cfg):
     return {"class": "torch.nn." + loss_type}, from_true_labels
 
 
+def get_base_model_file(path):
+    if not os.path.exists(path):
+        print("going to download model.t7")
+        raw_data_source = 'https://drive.switch.ch/index.php/s/PnLTX78Gefrqqut/download'
+        urllib.request.urlretrieve(raw_data_source, path)
+        print("model.t7 successfully downloaded")
+
+
+
 def get_base_model(dataset, base_model_type):
     base_path = "base_model_trained_files"
+
+
+    #download
 
     model_file = os.path.join(
         base_path, dataset, base_model_type, "model.t7")
 
+    get_base_model_file(model_file)
     num_classes = 10
     input_size = None
 
@@ -307,6 +322,8 @@ if __name__ == "__main__":
     use_wandb = False
     if "use_wandb" in cfg:
         use_wandb = cfg["use_wandb"]
+        exp_name = f"Encoder{tr_enc}_Decoder{tr_dec}_Par{tr_parity}_lr{lr}_bs{BATCH_SIZE}x{SEQ_LEN}"
+        wandb.init(project=cfg["wandb_project"], name=exp_name, config=cfg)
 
     # Before the training and testing phases
     print("Unique Time Identifier: " + unique_time)
@@ -376,10 +393,10 @@ if __name__ == "__main__":
                         try:
                             trainer = ParityModelTrainer(config_map,
                                                          checkpoint_cycle=args.checkpoint_cycle)
-                            if use_wandb:
-                                exp_name = f"Encoder{tr_enc}_Decoder{tr_dec}_Par{tr_parity}_lr{lr}_bs{BATCH_SIZE}x{SEQ_LEN}"
+                            #if use_wandb:
 
-                                wandb.init(project=cfg["wandb_project"], name=exp_name, config=cfg)
+
+                                #wandb.init(project=cfg["wandb_project"], name=exp_name, config=cfg)
 
                             stats = trainer.train(wandb=use_wandb)
                             with open(f"{ckpt_path}/summary.json", "w") as fs:

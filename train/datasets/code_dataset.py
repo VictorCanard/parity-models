@@ -19,7 +19,7 @@ from data.wikitext import get_wikitext_data
 
 VOCAB_SIZE = 50304
 SEQ_LEN = 512
-BATCH_SIZE = 50
+BATCH_SIZE = 12
 
 
 class CodeDataset(Dataset):
@@ -382,7 +382,7 @@ class CatDogCodeDataset(FolderCodeDataset):
                          code_transform=code_transform)
 
 
-data_dir = "data/datasets/wikitext/{}"
+#data_dir = "data/datasets/wikitext/{}"
 data_dictionary = get_wikitext_data()
 
 

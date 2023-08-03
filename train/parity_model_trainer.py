@@ -92,11 +92,10 @@ class ParityModelTrainer(object):
             data_loader = tqdm(data_loader, ascii=True,
                                desc="Epoch {}. {}".format(self.cur_epoch, label))
 
-        for mb_data, mb_labels, mb_true_labels in data_loader:  # Is it ok putting one batch of data on the gpu?
-            mb_data = try_cuda(mb_data.view(-1, self.ec_k, mb_data.size(1)))
-            mb_labels = try_cuda(
-                mb_labels.view(-1, self.ec_k, mb_labels.size(1), mb_labels.size(2)))  # size 2?
-            mb_true_labels = try_cuda(mb_true_labels.view(-1, self.ec_k, mb_true_labels.size(1)))
+        for mb_data, mb_labels, mb_true_labels in data_loader:  # Is it ok putting one batch of data on the gpu? removed the try_cuda
+            mb_data = mb_data.view(-1, self.ec_k, mb_data.size(1))
+            mb_labels = mb_labels.view(-1, self.ec_k, mb_labels.size(1), mb_labels.size(2))  # size 2?
+            mb_true_labels = mb_true_labels.view(-1, self.ec_k, mb_true_labels.size(1))
 
             if do_step:
                 if self.train_parity_model: self.parity_model_opt.zero_grad()
