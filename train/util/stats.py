@@ -96,10 +96,11 @@ class StatsTracker(object):
         from the base model and (2) the true labels associated with the decoded
         sample. These results are maintained for later aggregate statistics.
         """
+        # bs sl nes
         self.num_match_attempts += decoded.size(0)
 
-        max_decoded = torch.max(decoded, dim=3)[1]
-        max_outputs = torch.max(base_model_outputs, dim=3)[1]
+        max_decoded = torch.max(decoded, dim=3)[1] # 1 and 50304: word
+        max_outputs = torch.max(base_model_outputs, dim=3)[1] #
 
         t1 = (max_decoded == max_outputs).float()
         top1_rec_corr = torch.sum(

@@ -33,6 +33,7 @@ class ParityModelTrainer(object):
         checkpoint_cycle: int
             Number of epochs between model checkpoints
         """
+
         self.__init_from_config_map(config_map)
         self.erase_mask, self.acc_mask = self.__gen_masks()
         self.checkpoint_cycle = checkpoint_cycle
@@ -89,10 +90,13 @@ class ParityModelTrainer(object):
             data_loader = tqdm(data_loader, ascii=True,
                                desc="Epoch {}. {}".format(self.cur_epoch, label))
 
-        eval_freq = 1000
+        eval_freq = 50
         b = 0
+
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         for mb_data, mb_labels, mb_true_labels in data_loader:
             print("got to after batch sampling")
+            print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
             mb_data = mb_data.view(-1, self.ec_k, mb_data.size(1))
             mb_labels = mb_labels.view(-1, self.ec_k, mb_labels.size(1), mb_labels.size(2))
             mb_true_labels = mb_true_labels.view(-1, self.ec_k, mb_true_labels.size(1))
@@ -101,6 +105,7 @@ class ParityModelTrainer(object):
                 if self.train_parity_model: self.parity_model_opt.zero_grad()
                 if self.train_encoder: self.encoder_opt.zero_grad()
                 if self.train_decoder: self.decoder_opt.zero_grad()
+
 
             loss = self.__forward(mb_data, mb_labels, mb_true_labels, stats)
 
@@ -117,8 +122,11 @@ class ParityModelTrainer(object):
                         self.cur_epoch, label, rtop1, rtop5, rloss))
 
             b = b + 1
-            if b % eval_freq == 0:
-                self.save_acc(label, stats, wandb)
+            # if b % eval_freq == 0:
+            #     self.save_acc(label, stats, wandb)
+
+            if b == 100:
+                break
 
         epoch_loss, epoch_acc_map = self.save_acc(label, stats, wandb)
         top_recon = epoch_acc_map["reconstruction_top1"]
@@ -172,6 +180,8 @@ class ParityModelTrainer(object):
             erase_mask[i, erased_idx, :] = 0.
             acc_mask[i, erased_idx] = 1
 
+        print(erase_mask.size())
+        print(acc_mask.size())
         return try_cuda(erase_mask), try_cuda(acc_mask)
 
     def __forward(self, mb_data, mb_labels, mb_true_labels, stats):
@@ -205,6 +215,7 @@ class ParityModelTrainer(object):
         # If the decoder is not to be trained, then loss is calculated by
         # comparing the output of the parity model to the output required by
         # the decoder for exact recovery.
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         if not self.train_decoder:
             parity_model_target = self.decoder.combine_labels(mb_labels)
 
@@ -223,6 +234,8 @@ class ParityModelTrainer(object):
         # Create masks to be used for this minibatch
         bs, kplusr, sl, vs = in_decode.size()
         mb_emask = torch.unsqueeze(self.erase_mask, dim=2).repeat(batch_size, 1, sl, 1)
+        print("mb e mask size is ")
+        print(mb_emask.size())
         mb_amask = torch.unsqueeze(self.acc_mask, dim=2).repeat(batch_size, 1, sl)
 
         # Erase entries before passing into decode. The mask simulates each
@@ -231,10 +244,13 @@ class ParityModelTrainer(object):
         in_decode = in_decode.repeat(1, num_erasure_scenarios, 1, 1).view(
             batch_size * num_erasure_scenarios, kplusr, sl, vs)
         in_decode = in_decode * mb_emask
+        print("This is in decode size")
+        print(in_decode.size())
 
         # Perform decoding
         decoded = self.decoder(in_decode)
 
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         # Prepare labels for calculating accuracy
         bs, k, sl, out_dim = mb_labels.size()
         labels = mb_labels.repeat(1, num_erasure_scenarios, 1, 1).view(
@@ -242,6 +258,7 @@ class ParityModelTrainer(object):
         true_labels = mb_true_labels.repeat(1, num_erasure_scenarios, 1)
         true_labels = true_labels.view(batch_size * num_erasure_scenarios, k, sl)
 
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         # If the decoder is to be trained, then loss is calculated by comparing
         # the decoded outputs to the output that would have been available if
         # the original output was available.
@@ -261,6 +278,7 @@ class ParityModelTrainer(object):
 
         stats.update_loss(loss.item())
         stats.update_accuracies(decoded, labels, true_labels, mb_amask)
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         return loss
 
     def encode_and_forward(self, mb_data):

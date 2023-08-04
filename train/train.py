@@ -4,6 +4,7 @@ import os
 import sys
 import urllib
 import zipfile
+import torch
 from shutil import copyfile
 
 import wandb
@@ -12,7 +13,7 @@ from parity_model_trainer import ParityModelTrainer
 
 from datetime import datetime, timedelta
 
-from constants import DEF_WEIGHT_DECAY, DEF_LR, DEF_NUM_EPOCH, BATCH_SIZE, SEQ_LEN
+from constants import DEF_WEIGHT_DECAY, DEF_LR, DEF_NUM_EPOCH, BATCH_SIZE, SEQ_LEN, SMALL_MODEL, LARGE_MODEL
 
 
 
@@ -74,7 +75,7 @@ def get_loss(loss_type, cfg):
 def get_base_model_file(path):
     if not os.path.exists(path):
         print("going to download model.t7")
-        raw_data_source = 'https://drive.switch.ch/index.php/s/PnLTX78Gefrqqut/download'
+        raw_data_source = LARGE_MODEL
         os.makedirs(path, exist_ok=True)
         urllib.request.urlretrieve(raw_data_source, os.path.join(path, "model.t7"))
         print("model.t7 successfully downloaded")
@@ -391,11 +392,8 @@ if __name__ == "__main__":
                         try:
                             trainer = ParityModelTrainer(config_map,
                                                          checkpoint_cycle=args.checkpoint_cycle)
-                            #if use_wandb:
 
-
-                                #wandb.init(project=cfg["wandb_project"], name=exp_name, config=cfg)
-
+                            print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
                             trainer.train(wandb=True)
                             # with open(f"{ckpt_path}/summary.json", "w") as fs:
                             #     json.dump(stats, fs)

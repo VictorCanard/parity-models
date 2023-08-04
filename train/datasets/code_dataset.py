@@ -134,8 +134,11 @@ class CodeDataset(Dataset):
         #     data = self.dataset.data[idx]
 
         data, target = self.dataset[idx] #Calls getitem from WikiDataset
-
+        print("before getting output")
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         out = self.base_model(data)
+        print("after getting ouput")
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         return torch.squeeze(data), torch.squeeze(out["logits"]), torch.squeeze(target)
 
     def __len__(self):
@@ -389,6 +392,7 @@ class WikiText(Dataset):
 
     def __getitem__(self, i):
         print("got item at " + str(i))
+        print(torch.cuda.memory_summary(device='cuda:0', abbreviated=False))
         x = torch.stack([torch.from_numpy((self.data[i:i + self.seq_length]).astype(np.int64))])
         y = torch.stack([torch.from_numpy((self.data[i + 1:i + 1 + self.seq_length]).astype(np.int64))])
         if torch.cuda.is_available():
