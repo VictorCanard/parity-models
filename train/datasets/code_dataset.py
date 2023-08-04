@@ -14,12 +14,7 @@ from util.util import construct, try_cuda
 
 from data.wikitext import get_wikitext_data
 
-
-
-
-VOCAB_SIZE = 50304
-SEQ_LEN = 512
-BATCH_SIZE = 12
+from constants import VOCAB_SIZE, BATCH_SIZE, SEQ_LEN
 
 
 class CodeDataset(Dataset):
@@ -139,9 +134,9 @@ class CodeDataset(Dataset):
         #     data = self.dataset.data[idx]
 
         data, target = self.dataset[idx] #Calls getitem from WikiDataset
+
         out = self.base_model(data)
         return torch.squeeze(data), torch.squeeze(out["logits"]), torch.squeeze(target)
-        #return self.dataset[idx]
 
     def __len__(self):
         # Number of samples in an epoch is equal to the number of `ec_k`-sized
@@ -382,18 +377,14 @@ class CatDogCodeDataset(FolderCodeDataset):
                          code_transform=code_transform)
 
 
-#data_dir = "data/datasets/wikitext/{}"
-data_dictionary = get_wikitext_data()
-
-
 
 class WikiText(Dataset):
-    def __init__(self, name):
+    def __init__(self, name, data_dictionary):
         # self, name, base_model, num_classes, base_dataset, ec_k,
 
         assert name in {'train', 'test', 'val'}
 
-        self.seq_length = SEQ_LEN  # rename to seq len
+        self.seq_length = SEQ_LEN
         self.data = data_dictionary[name]
 
     def __getitem__(self, i):
@@ -412,9 +403,9 @@ class WikiText(Dataset):
 
 
 class WikiTextDataset(CodeDataset):
-    def __init__(self, name, base_model, ec_k, encoder_transforms):  # Todo important to adapt for encoder_transforms?
+    def __init__(self, name, base_model, ec_k, encoder_transforms, data):  # Todo important to adapt for encoder_transforms?
 
-        super().__init__(name=name, base_model=base_model, ec_k=ec_k, base_dataset=WikiText(name=name),
+        super().__init__(name=name, base_model=base_model, ec_k=ec_k, base_dataset=WikiText(name=name, data_dictionary=data),
                          num_classes=VOCAB_SIZE)
 
 
@@ -445,28 +436,35 @@ def get_dataloaders(dataset_path, base_model, ec_k, batch_size,
     {train, val, test}_dataloader: ``torch.utils.data.DataLoader``
         Dataloaders to be used for training, validation, and testing.
     """
+
+    data_dictionary = get_wikitext_data()
+
     train_dataset = construct(dataset_path,
                               {"name": "train",
                                "base_model": base_model,
                                "ec_k": ec_k,
-                               "encoder_transforms": encoder_transforms})
+                               "encoder_transforms": encoder_transforms,
+                               "data" : data_dictionary})
 
     val_dataset = construct(dataset_path,
                             {"name": "val",
                              "base_model": base_model,
                              "ec_k": ec_k,
-                             "encoder_transforms": encoder_transforms})
+                             "encoder_transforms": encoder_transforms,
+                             "data" : data_dictionary})
 
     test_dataset = construct(dataset_path,
                              {"name": "test",
                               "base_model": base_model,
                               "ec_k": ec_k,
-                              "encoder_transforms": encoder_transforms})
+                              "encoder_transforms": encoder_transforms,
+                              "data" : data_dictionary})
 
     # Each sample for the encoder/decoder consists of `ec_k` images from
     # the underlying dataset. Thus, the batch size for drawing samples from
     # the underlying dataset is `batch_size * ec_k`
-    batch_size_for_loading = ec_k * batch_size  # todo bs here should be 50 and not 64
+    batch_size_for_loading = ec_k * batch_size
+    print("bsl = " + str(batch_size_for_loading))
     if "CatDog" in dataset_path["class"] or "GCommand" in dataset_path["class"]:
         num_workers = 4
         pin_mem = torch.cuda.is_available()
@@ -496,7 +494,7 @@ def get_dataloaders(dataset_path, base_model, ec_k, batch_size,
         #if remainder != 0:
         #    num_val += (ec_k - remainder)
 
-        #train_indices = indices[num_val:]  # todo what is this for? how can i adpat it?
+        #train_indices = indices[num_val:] #What is this for how can I adapt it?
         #val_indices = indices[:num_val]
         #train_sampler = data.sampler.SequentialSampler(train_indices)
         #val_sampler = data.sampler.SequentialSampler(val_indices)

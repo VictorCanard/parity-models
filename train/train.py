@@ -12,11 +12,8 @@ from parity_model_trainer import ParityModelTrainer
 
 from datetime import datetime, timedelta
 
-DEF_NUM_EPOCH = 500
-DEF_LR = 1e-3
-DEF_WEIGHT_DECAY = 1e-5
+from constants import DEF_WEIGHT_DECAY, DEF_LR, DEF_NUM_EPOCH, BATCH_SIZE, SEQ_LEN
 
-from datasets.code_dataset import SEQ_LEN, BATCH_SIZE
 
 
 def get_config(lr, w_decay, num_epoch, ec_k, loss, encoder, decoder, base_model_file,
@@ -78,7 +75,8 @@ def get_base_model_file(path):
     if not os.path.exists(path):
         print("going to download model.t7")
         raw_data_source = 'https://drive.switch.ch/index.php/s/PnLTX78Gefrqqut/download'
-        urllib.request.urlretrieve(raw_data_source, path)
+        os.makedirs(path, exist_ok=True)
+        urllib.request.urlretrieve(raw_data_source, os.path.join(path, "model.t7"))
         print("model.t7 successfully downloaded")
 
 
@@ -90,7 +88,7 @@ def get_base_model(dataset, base_model_type):
     #download
 
     model_file = os.path.join(
-        base_path, dataset, base_model_type, "model.t7")
+        base_path, dataset, base_model_type)
 
     get_base_model_file(model_file)
     num_classes = 10
@@ -204,7 +202,7 @@ def get_base_model(dataset, base_model_type):
         }
     else:
         raise Exception("Unrecognized dataset name '{}'".format(dataset))
-    return model_file, base, input_size, ds
+    return os.path.join(model_file, "model.t7"), base, input_size, ds
 
 
 def get_parity_model(dataset, parity_model_type):
@@ -319,7 +317,7 @@ if __name__ == "__main__":
         wd = cfg["weight_decay"]
 
     ##Wandb
-    use_wandb = False
+    use_wandb = True
     if "use_wandb" in cfg:
         use_wandb = cfg["use_wandb"]
         exp_name = f"Encoder{tr_enc}_Decoder{tr_dec}_Par{tr_parity}_lr{lr}_bs{BATCH_SIZE}x{SEQ_LEN}"
@@ -373,13 +371,13 @@ if __name__ == "__main__":
                                                 loss_from_true_labels,
                                                 cfg)
 
-                        ckpt_path = save_dir #os.path.join(args.results_base_folder, args.dataset, args.model, exp_name)
-                        if not os.path.exists(ckpt_path):
-                            os.makedirs(ckpt_path)
-                        elif os.path.isfile(
-                                os.path.join(ckpt_path, "summary.json")):  # the experiment was already completed
-                            print(f"Already found experiment '{ckpt_path}'.\nSkipping.")
-                            sys.exit(0)
+                        # ckpt_path = save_dir #os.path.join(args.results_base_folder, args.dataset, args.model, exp_name)
+                        # if not os.path.exists(ckpt_path):
+                        #     os.makedirs(ckpt_path)
+                        # elif os.path.isfile(
+                        #         os.path.join(ckpt_path, "summary.json")):  # the experiment was already completed
+                        #     print(f"Already found experiment '{ckpt_path}'.\nSkipping.")
+                        #     sys.exit(0)
 
                         if args.continue_from_file:
                             config_map["continue_from_file"] = args.continue_from_file
@@ -398,8 +396,8 @@ if __name__ == "__main__":
 
                                 #wandb.init(project=cfg["wandb_project"], name=exp_name, config=cfg)
 
-                            stats = trainer.train(wandb=use_wandb)
-                            with open(f"{ckpt_path}/summary.json", "w") as fs:
-                                json.dump(stats, fs)
+                            trainer.train(wandb=True)
+                            # with open(f"{ckpt_path}/summary.json", "w") as fs:
+                            #     json.dump(stats, fs)
                         except KeyboardInterrupt:
                             print("INTERRUPTED")

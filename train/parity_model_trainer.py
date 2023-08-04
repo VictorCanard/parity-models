@@ -37,9 +37,6 @@ class ParityModelTrainer(object):
         self.erase_mask, self.acc_mask = self.__gen_masks()
         self.checkpoint_cycle = checkpoint_cycle
 
-
-
-
     def train(self, wandb=False):
         """
         Trains the encoder and decoder as specified via configuration.
@@ -92,9 +89,12 @@ class ParityModelTrainer(object):
             data_loader = tqdm(data_loader, ascii=True,
                                desc="Epoch {}. {}".format(self.cur_epoch, label))
 
-        for mb_data, mb_labels, mb_true_labels in data_loader:  # Is it ok putting one batch of data on the gpu? removed the try_cuda
+        eval_freq = 1000
+        b = 0
+        for mb_data, mb_labels, mb_true_labels in data_loader:
+            print("got to after batch sampling")
             mb_data = mb_data.view(-1, self.ec_k, mb_data.size(1))
-            mb_labels = mb_labels.view(-1, self.ec_k, mb_labels.size(1), mb_labels.size(2))  # size 2?
+            mb_labels = mb_labels.view(-1, self.ec_k, mb_labels.size(1), mb_labels.size(2))
             mb_true_labels = mb_true_labels.view(-1, self.ec_k, mb_true_labels.size(1))
 
             if do_step:
@@ -116,15 +116,22 @@ class ParityModelTrainer(object):
                     "Epoch {}. {}. Top-1={:.4f}, Top-5={:.4f}, Loss={:.4f}".format(
                         self.cur_epoch, label, rtop1, rtop5, rloss))
 
+            b = b + 1
+            if b % eval_freq == 0:
+                self.save_acc(label, stats, wandb)
+
+        epoch_loss, epoch_acc_map = self.save_acc(label, stats, wandb)
+        top_recon = epoch_acc_map["reconstruction_top1"]
+        top_overall = epoch_acc_map["overall_top1"]
+        return epoch_loss, top_recon, top_overall
+
+    def save_acc(self, label, stats, using_wandb):
         epoch_loss, epoch_acc_map = stats.averages()
         outfile_fmt = os.path.join(self.save_dir, label + "_{}.txt")
         epoch_map = epoch_acc_map
         epoch_map["loss"] = epoch_loss
-        util.util.write_vals_dict(outfile_fmt, epoch_map, wandb, label)
-
-        top_recon = epoch_acc_map["reconstruction_top1"]
-        top_overall = epoch_acc_map["overall_top1"]
-        return epoch_loss, top_recon, top_overall 
+        util.util.write_vals_dict(outfile_fmt, epoch_map, using_wandb, label)
+        return epoch_loss, epoch_acc_map
 
     def __gen_masks(self):
         """Generates masks to be used when erasing indices, calculating loss,
@@ -210,7 +217,6 @@ class ParityModelTrainer(object):
         # the orignal units, we simply concatenate our parity output with those.
         new_parity_output = parity_output.view(
             batch_size, 1, -1, parity_output.size(-1))
-        #new_parity_output = torch.clone(parity_output)
 
         in_decode = torch.cat((mb_labels, new_parity_output), dim=1)
 
@@ -239,7 +245,7 @@ class ParityModelTrainer(object):
         # If the decoder is to be trained, then loss is calculated by comparing
         # the decoded outputs to the output that would have been available if
         # the original output was available.
-        if self.train_decoder: #Have to check; no idea if this works
+        if self.train_decoder:  # Have to check; no idea if this works
             predictions = decoded.view(-1, out_dim)
 
             # Prepare appropriate targets for loss depending on whether we're
@@ -258,6 +264,7 @@ class ParityModelTrainer(object):
         return loss
 
     def encode_and_forward(self, mb_data):
+
         if type(self.encoder).__name__ == "EmbeddedEncoder":
             # Return the sum of token and pos embeddings of the data
             first_layer_out = self.parity_model.forward1(mb_data)
@@ -266,7 +273,7 @@ class ParityModelTrainer(object):
             parity = self.encoder(first_layer_out)
 
             # Finally continue the gpt process as normal
-            parity_output = self.parity_model.forward2(parity)["logits"] #TODO FIx DIMS need 2 x1 x 50304
+            parity_output = self.parity_model.forward2(parity)["logits"]
         else:
             # Perform the encoding
             parity = self.encoder(mb_data).long()
@@ -382,6 +389,7 @@ class ParityModelTrainer(object):
         base_model_input_size = config_map["base_model_input_size"]
         self.parity_model = BaseModelWrapper(underlying_parity_model,
                                              base_model_input_size)
+        self.parity_model = try_cuda(self.parity_model)
 
         if self.train_parity_model:
             self.parity_model_opt = construct(config_map["Optimizer"],
@@ -401,7 +409,7 @@ class ParityModelTrainer(object):
         else:
             self.decoder.eval()
 
-        self.parity_model = try_cuda(self.parity_model)
+        # self.parity_model = try_cuda(self.parity_model)
         self.encoder = try_cuda(self.encoder)
         self.decoder = try_cuda(self.decoder)
 

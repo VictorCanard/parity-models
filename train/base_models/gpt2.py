@@ -265,7 +265,6 @@ class GPTBase(nn.Module):
 
     @classmethod
     def from_pretrained(cls, model_type, override_args=None):
-        # TODO
         pass
 
     def get_parameter_group_specs(self):
